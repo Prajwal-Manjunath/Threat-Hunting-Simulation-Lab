@@ -365,5 +365,14 @@ An attacker embedded a malicious `postinstall` hook inside the npm package `heal
 | Defence Evasion | T1027 | Obfuscated Files or Information | Base64 encoded commands throughout |
 | Command & Control | T1071.001 | Web Protocols | HTTP download over port 80 |
 | Persistence | T1547.001 | Registry Run Keys / Startup Folder | `HKCU\...\Run\Windows Update Monitor` |
+
+## 🔗 TryHackMe Public Summary
  
+View the official completed simulation report here:  
+👉 [Health Hazard — Public Summary](https://tryhackme.com/threat-hunting-sim/public-summary/ca58db9a8263b31b377c5cf36f66257f837a4bc79fee04495bd970a958b0c0942b53ced27ca5d11d1efdc6ba1b4d1b33)
+ 
+---
+ 
+*Writeup by Prajwal Manjunath | [GitHub](https://github.com/Prajwal-Manjunath) | [TryHackMe](https://tryhackme.com/p/KnightZeusDracobolt)*  
+*Investigated and documented with guidance from Claude (Anthropic) as my teaching analyst.* 
 ---
