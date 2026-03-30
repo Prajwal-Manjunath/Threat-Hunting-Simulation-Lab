@@ -153,7 +153,7 @@ node.exe automatically spawned cmd.exe. Tom did not manually open cmd.exe this w
 
 ---
 
-#### Log 4 — `10:58:27` | EventCode 1 | Hidden PowerShell spawned
+#### Log 4 - `10:58:27` | EventCode 1 | Hidden PowerShell spawned
 > ![Event Log 4 - npm install](https://raw.githubusercontent.com/Prajwal-Manjunath/Threat-Hunting-Simulation-Lab/main/images/event-log-4.png)
 
 | Field | Value |
@@ -169,11 +169,11 @@ cmd.exe launched a hidden PowerShell instance with an encoded command. The flags
 
 | Flag | Meaning |
 |---|---|
-| `-NoP` | No Profile — don't load PowerShell profile, faster and quieter |
-| `-W Hidden` | Hidden window — no visible terminal appears |
-| `-EncodedCommand` | Command is Base64 encoded — obfuscates intent from logs |
+| `-NoP` | No Profile: don't load PowerShell profile, faster and quieter |
+| `-W Hidden` | Hidden window: no visible terminal appears |
+| `-EncodedCommand` | Command is Base64 encoded: obfuscates intent from logs |
 
-The `/c` flag in the parent cmd.exe command means cmd.exe was told to run PowerShell and immediately exit - so cmd.exe disappears quickly and leaves less trace.
+The `/c` flag in the parent cmd.exe command means cmd.exe was told to run PowerShell and immediately exit so cmd.exe disappears quickly and leaves less trace.
 
 ---
 
