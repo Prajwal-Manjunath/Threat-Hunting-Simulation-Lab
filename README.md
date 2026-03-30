@@ -269,7 +269,7 @@ The script handles both execution **and** persistence in a single pass. One Powe
 
 ---
 
-## Findings - Phase 3: Persistence
+## Findings Phase 3: Persistence
  
 ### Query Used
 ```spl
@@ -293,17 +293,17 @@ index=* "Windows Update Monitor"
 | ProcessGuid | `{c5d2b969-9053-6856-e701-000000002a01}` |
  
 **What this tells us:**  
-The malicious PowerShell wrote a registry Run key named `Windows Update Monitor` — deliberately named to blend in with legitimate Windows processes. Every time Tom logs into Windows, this key silently fires a hidden PowerShell command that launches `SystemHealthUpdater.exe` from his AppData folder.
+The malicious PowerShell wrote a registry Run key named `Windows Update Monitor`  deliberately named to blend in with legitimate Windows processes. Every time Tom logs into Windows, this key silently fires a hidden PowerShell command that launches `SystemHealthUpdater.exe` from his AppData folder.
  
 The `Details` field contains another Base64 encoded command which decodes to:
 ```powershell
 Start-Process 'C:\Users\Administrator\AppData\Roaming\SystemHealthUpdater.exe'
 ```
  
-Note Sysmon itself tagged this with `RuleName: T1060,RunKey` — confirming this is a known persistence technique already mapped in the detection ruleset.
+Note Sysmon itself tagged this with `RuleName: T1060,RunKey` confirming this is a known persistence technique already mapped in the detection ruleset.
  
 **Key linking observation:**  
-The `ProcessGuid` across Logs 4, 5, and 6 is identical — `{c5d2b969-9053-6856-e701-000000002a01}`. One single malicious PowerShell process was responsible for the encoded execution, the DNS query, and the registry persistence write. This is the thread that ties the entire execution phase together.
+The `ProcessGuid` across Logs 4, 5, and 6 is identical `{c5d2b969-9053-6856-e701-000000002a01}`. One single malicious PowerShell process was responsible for the encoded execution, the DNS query, and the registry persistence write. This is the thread that ties the entire execution phase together.
  
 ---
  
@@ -334,11 +334,11 @@ The `ProcessGuid` across Logs 4, 5, and 6 is identical — `{c5d2b969-9053-6856-
  
 ---
  
-## ✅ Hypothesis Validation — Final
+## ✅ Hypothesis Validation Final
  
 > **The hypothesis is CONFIRMED.**
  
-An attacker embedded a malicious `postinstall` hook inside the npm package `healthchk-lib@1.0.1`. When Tom ran `npm install`, the hook automatically executed a hidden PowerShell command that downloaded a payload from a typosquatted domain and established persistence via a registry Run key — all without Tom performing any action beyond a routine package install.
+An attacker embedded a malicious `postinstall` hook inside the npm package `healthchk-lib@1.0.1`. When Tom ran `npm install`, the hook automatically executed a hidden PowerShell command that downloaded a payload from a typosquatted domain and established persistence via a registry Run key; all without Tom performing any action beyond a routine package install.
  
 ---
  
