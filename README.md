@@ -90,7 +90,7 @@ ParentImage     = WHO launched it
 ParentCommandLine = HOW the parent launched it
 ```
 
-This is how you build a process tree — and a process tree is how you reconstruct an attack chain.
+This is how you build a process tree and a process tree is how you reconstruct an attack chain.
 
 ### Phase 1 Query: Initial Access
 **Search:**
