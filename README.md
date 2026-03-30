@@ -54,7 +54,7 @@ Before touching the SIEM, the IOCs provided a roadmap of exactly what to look fo
 | Hostname | `global-update.wlndows.thm` |
 | Protocol / Port | HTTP / Port 80 |
 
-**Key observation before searching:** The domain `wlndows.thm` is a typosquatted version of `windows` — designed to look legitimate at a glance. This is a deliberate defence evasion technique used by the attacker.
+**Key observation before searching:** The domain `wlndows.thm` is a typosquatted version of `windows` designed to look legitimate at a glance. This is a deliberate defence evasion technique used by the attacker.
 
 Reading the IOCs told us the likely attack flow before I ran a single query:
 1. Tom runs `npm install healthchk-lib@1.0.1`
